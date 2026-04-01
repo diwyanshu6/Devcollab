@@ -54,7 +54,7 @@ app.use(errorHandler);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // change later to frontend URL
+    origin: "https://devcollab-one.vercel.app", 
     methods: ["GET", "POST"],
     credentials: true
   }
