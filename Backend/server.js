@@ -11,22 +11,22 @@ const AppError = require("./utils/AppError");
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS
+//  CORS 
 app.use(cors({
-  origin: "http://localhost:5173", // Frontend URL
+  origin: "*", 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
 app.use(express.json());
 
-// Logger
+// ✅ Logger 
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
   next();
 });
 
-// Routes
+//  Routes
 const userRouter = require("./routes/userRoutes");
 const workspaceRouter = require("./routes/workspaceRoutes");
 const chatRouter = require("./routes/chatRoutes");
@@ -37,22 +37,24 @@ app.use("/api/workspaces", workspaceRouter);
 app.use("/api/chats", chatRouter);
 app.use("/api/notes", notesRouter);
 
+//  Health check
 app.get("/", (req, res) => {
-  res.send("DevCollab API Running ");
+  res.send("DevCollab API Running 🚀");
 });
 
-// Handle undefined routes
+//  Undefined routes handler
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
-// Global Error Handler
+//  Global Error Handler
 app.use(errorHandler);
 
-// --- SOCKET.IO SETUP ---
+// ================= SOCKET.IO =================
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*", // change later to frontend URL
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -61,68 +63,84 @@ const io = new Server(server, {
 const { saveMessageToDB } = require("./controllers/chatController");
 const pool = require("./config/db");
 
-// Socket Authentication Middleware
+//  Socket Auth Middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
+
   if (!token) {
-    return next(new Error("Authentication error: No token provided"));
+    return next(new Error("Authentication error"));
   }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     socket.user = decoded;
     next();
   } catch (err) {
-    next(new Error("Authentication error: Invalid token"));
+    next(new Error("Authentication error"));
   }
 });
 
+// Socket Events
 io.on("connection", (socket) => {
-  console.log(`User connected to socket: ${socket.user.id}`);
+  console.log(`User connected: ${socket.user.id}`);
 
+  // Join workspace room
   socket.on("join_workspace", async (workspaceId) => {
     try {
-      // Re-verify membership just in case
       const result = await pool.query(
         "SELECT * FROM workspace_members WHERE user_id=$1 AND workspace_id=$2",
         [socket.user.id, workspaceId]
       );
+
       if (result.rows.length > 0) {
         socket.join(workspaceId.toString());
-        console.log(`User ${socket.user.id} joined room ${workspaceId}`);
+        console.log(`User ${socket.user.id} joined workspace ${workspaceId}`);
       } else {
-        socket.emit("error", "Not a member of this workspace");
+        socket.emit("error", "Access denied");
       }
     } catch (err) {
       console.error(err);
-      socket.emit("error", "Server error joining workspace");
+      socket.emit("error", "Server error");
     }
   });
 
+  // Send message
   socket.on("send_message", async ({ workspaceId, message }) => {
     try {
-      // saveMessageToDB validates membership
-      const newMsg = await saveMessageToDB(socket.user.id, workspaceId, message);
-      
-      // Fetch user name to broadcast properly
-      const userRes = await pool.query("SELECT name FROM users WHERE id=$1", [socket.user.id]);
+      if (!message || message.trim() === "") {
+        return socket.emit("error", "Message cannot be empty");
+      }
+
+      const newMsg = await saveMessageToDB(
+        socket.user.id,
+        workspaceId,
+        message
+      );
+
+      const userRes = await pool.query(
+        "SELECT name FROM users WHERE id=$1",
+        [socket.user.id]
+      );
+
       const name = userRes.rows[0]?.name || "Unknown";
-      
+
       const fullMessage = { ...newMsg, name };
-      
-      // Emit to room
+
       io.to(workspaceId.toString()).emit("receive_message", fullMessage);
     } catch (err) {
-      // emit error back to sender
-      socket.emit("error", err.message);
+      socket.emit("error", "Failed to send message");
     }
   });
 
   socket.on("disconnect", () => {
-    console.log(`User disconnected from socket: ${socket.user.id}`);
+    console.log(`User disconnected: ${socket.user.id}`);
   });
 });
 
-const PORT = 5000;
+// ================= SERVER =================
+
+const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
