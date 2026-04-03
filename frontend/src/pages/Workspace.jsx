@@ -122,16 +122,18 @@ export default function Workspace() {
   };
 
   const generateInviteLink = async () => {
-    try {
-      const { data } = await api.put(`/workspaces/${id}/invite_code`);
-      const code = data.data.invite_code;
-      const link = `http://localhost:5173/join/${code}`;
-      await navigator.clipboard.writeText(link);
-      alert('Invite link copied to clipboard!');
-    } catch (err) {
-      alert('Error generating invite link');
-    }
-  };
+  try {
+    const { data } = await api.put(`/workspaces/${id}/invite_code`);
+    const code = data.data.invite_code;
+
+    const link = `${import.meta.env.VITE_FRONTEND_URL}/join/${code}`;
+
+    await navigator.clipboard.writeText(link);
+    alert('Invite link copied to clipboard!');
+  } catch (err) {
+    alert('Error generating invite link');
+  }
+};
 
   const handleDeleteWorkspace = async () => {
     if (!window.confirm("Are you sure you want to delete this workspace? This action is permanent!")) return;
