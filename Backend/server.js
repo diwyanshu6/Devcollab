@@ -55,9 +55,8 @@ app.use(errorHandler);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://devcollab-one.vercel.app", 
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: "*", 
+    methods: ["GET", "POST"]
   }
 });
 
