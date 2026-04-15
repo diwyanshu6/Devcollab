@@ -39,7 +39,7 @@ export default function Workspace() {
   }, [messages, activeTab]);
 
   const initSocket = () => {
-    socketRef.current = io('import.meta.env.VITE_API_URL', {
+    socketRef.current = io(import.meta.env.VITE_API_URL, {
       auth: { token }
     });
     socketRef.current.on('connect', () => {
