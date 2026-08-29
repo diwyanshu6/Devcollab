@@ -74,7 +74,7 @@ const updateNote = asyncHandler(async (req, res) => {
     throw new AppError("Note not found", 404);
   }
 
-  // Ensure user is the author of the note or member? (The prompt: "Ensure only valid users can update/delete notes". Let's restrict to note author)
+  // Ensure user is the author of the note or member
   if (noteCheck.rows[0].user_id !== userId) {
     throw new AppError("Only the author can update this note", 403);
   }
